@@ -12,9 +12,31 @@ function createOrderFile() {
 
   var design = document.placedItems.add();
   design.file = new File(imagePath);
+
+  var originWidth = design.width;
+  var originHeight = design.height;
+
   design.width = square.width;
-  design.height = square.height;
+
+  var isPhoneCase =
+    templateFile.indexOf("하드케이스") !== -1 || templateFile.indexOf("젤리케이스") !== -1;
+
+  if (isPhoneCase) {
+    design.height = (originHeight / originWidth) * square.width;
+  } else {
+    design.height = square.height;
+  }
+
   design.position = square.position;
+  if (isPhoneCase) {
+    design.position = [
+      design.position[0],
+      design.position[1] + (design.height - square.height) / 2,
+    ];
+    //빼면 일러스트에서 내려간다.
+  }
+
+  //폰케이스일 경우, 포지션이 완전히 같게 되지 않는다. 크기가 동일하지 않기 때문에. 해당 부분 고칠 것.
 
   if (saveOption === "PMSColor") {
     var copied = design.duplicate();
@@ -22,23 +44,46 @@ function createOrderFile() {
 
     var traced = copied.trace();
 
-    traced.tracing.tracingOptions.tracingMode = TracingModeType.TRACINGMODEGRAY;
+    traced.tracing.tracingOptions.threshold = 249.999;
+    //하얀색보다 큰 것을 전부 스캔.
     traced.tracing.tracingOptions.ignoreWhite = true;
+    //ignoreWhite는 투명 영역을 포함하지 않는 것이다.
+
+    traced.tracing.tracingOptions.tracingMode = TracingModeType.TRACINGMODEBLACKANDWHITE;
+
+    //traced.tracing.tracingOptions.viewRaster = ViewRasterType.TRACINGVIEWRASTERTRANSPARENTIMAGE;
 
     //별색 start
     var pmfGroup = traced.tracing.expandTracing();
-    var pmfColor = new CMYKColor();
 
+    var spotCount = document.spots.length;
+
+    if (spotCount > 0) {
+      document.spots.removeAll();
+    }
+
+    var newSpot = document.spots.add();
+    newSpot.name = "RDG_WHITE";
+
+    var pmfColor = new CMYKColor();
     pmfColor.black = 25;
     pmfColor.cyan = 25;
     pmfColor.magenta = 25;
     pmfColor.yellow = 25;
 
+    // newSpot.name = "RDG_WHITE";
+    newSpot.colorType = ColorModel.SPOT;
+    newSpot.color = pmfColor;
+
+    var newSpotColor = new SpotColor();
+    newSpotColor.spot = newSpot;
+
+    //화이트 영역 부분
     pmfGroup.name = "별색 처리";
 
     for (var i = 0; i < pmfGroup.pathItems.length; i++) {
       pmfGroup.pathItems[i].filled = true;
-      pmfGroup.pathItems[i].fillColor = pmfColor;
+      pmfGroup.pathItems[i].fillColor = newSpotColor;
     }
     pmfGroup.moveToBeginning(group);
     //별색 end
@@ -52,17 +97,19 @@ function createOrderFile() {
 
   design.embed();
 
+  var resultFilePath;
   if (saveOption === "png") {
     var exportOptions = new ExportOptionsPNG24();
     var type = ExportType.PNG24;
     var fileSpec = new File(newFilePath);
-
+    var resultFilePath = newFilePath + ".png";
     document.exportFile(fileSpec, type, exportOptions);
   } else {
     document.saveAs(new File(newFilePath));
+    var resultFilePath = newFilePath + ".ai";
   }
 
   document.close(SaveOptions.DONOTSAVECHANGES);
 
-  return newFilePath;
+  return resultFilePath;
 }

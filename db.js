@@ -1,7 +1,8 @@
 const Transaction = require("./Transaction");
 const mongoose = require("mongoose");
+const Product = require("./Product");
 
-async function getTransaction() {
+async function getTransaction(status) {
   const db =
     "mongodb+srv://kyu_young:WaByPiHh7Wtmk5we@we2d.tsqtt.mongodb.net/we2d?retryWrites=true&w=majority";
   mongoose
@@ -15,11 +16,24 @@ async function getTransaction() {
       console.log("Connected");
     });
 
-  const transactions = await Transaction.find({ status: "paid" })
+  const transactions = await Transaction.find({ status: status })
     .sort({ createdAt: -1 })
-    .select("-iamPortData");
+    .select("-iamPortData")
+    .populate("productId");
 
-  return transactions;
+  return transactions.map((transaction) => transaction.toJSON());
 }
 
-module.exports = { getTransaction };
+async function updateTransactions(transactions) {
+  const result = await Promise.all(
+    transactions.map(async (transaction) => {
+      const updateTransaction = await Transaction.findByIdAndUpdate(transaction._id, {
+        status: "preparing",
+      });
+      return updateTransaction;
+    })
+  );
+  return result;
+}
+
+module.exports = { getTransaction, updateTransactions };

@@ -20,18 +20,24 @@ async function downloadImage(imageUrl) {
   return imageFilePath;
 }
 
-function makeFactoryFolder(factoryName) {
+function makeLocalTodayDir(factoryName) {
+  const localFolderPath = "/Users/jinwook/Desktop/order_history";
   const today = getToday();
-  const todayDir = `${path.dirname(require.main.filename)}/result/${today}`;
+
+  const date = new Date();
+  const month = `${date.getFullYear()}-${date.getMonth() + 1}`;
+
+  const monthDir = `${localFolderPath}/${factoryName}/${month}`;
+
+  if (!fs.existsSync(monthDir)) {
+    fs.mkdirSync(monthDir);
+  }
+
+  const todayDir = `${monthDir}/${today}`;
   if (!fs.existsSync(todayDir)) {
     fs.mkdirSync(todayDir);
   }
-
-  const factoryDir = `${todayDir}/${factoryName}`;
-  if (!fs.existsSync(factoryDir)) {
-    fs.mkdirSync(factoryDir);
-  }
-  return factoryDir;
+  return todayDir;
 }
 
 function phoneFomatter(num, type) {
@@ -64,9 +70,27 @@ function phoneFomatter(num, type) {
   return formatNum;
 }
 
+function getPrintAreaName(printArea) {
+  let name;
+  switch (printArea) {
+    case "front":
+      name = "앞면";
+      break;
+
+    case "back":
+      name = "뒷면";
+      break;
+
+    default:
+      name = printArea;
+  }
+  return name;
+}
+
 module.exports = {
   getToday,
   downloadImage,
-  makeFactoryFolder,
+  makeLocalTodayDir,
   phoneFomatter,
+  getPrintAreaName,
 };
