@@ -15,7 +15,7 @@ const createIllustratorFile = require("./illustrator");
 
 async function manufacuturing() {
   try {
-    const transactions = await Promise.resolve(getTransaction("issue"));
+    const transactions = await Promise.resolve(getTransaction("paid"));
     //해당 status에 해당하는 주문정보 받아오기.
 
     // 1. 거래 데이터 받아오기
@@ -40,13 +40,10 @@ async function manufacuturing() {
 
     const localPathAndFolderIds = await Promise.resolve(createIllustratorFile(trans_ill_drive));
 
-    //const uploadedFileIds = await Promise.resolve(uploadFiles(localPathAndFolderIds));
-    //주석 풀워줘야함.
+    const uploadedFileIds = await Promise.resolve(uploadFiles(localPathAndFolderIds));
 
     // update Transaction. (status preparing)
-
-    //const updatedTransactions = await Promise.resolve(updateTransactions(transactions));
-    //주석 풀워줘야함.
+    const updatedTransactions = await Promise.resolve(updateTransactions(transactions));
 
     console.log("거래 상태변경 완료");
     //5. 일러스트레이터 파일 돌리기.

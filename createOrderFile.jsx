@@ -40,6 +40,7 @@ function createOrderFile() {
 
   if (saveOption === "PMSColor") {
     var copied = design.duplicate();
+
     copied.name = "copied";
 
     var traced = copied.trace();
@@ -48,11 +49,7 @@ function createOrderFile() {
     //하얀색보다 큰 것을 전부 스캔.
     traced.tracing.tracingOptions.ignoreWhite = true;
     //ignoreWhite는 투명 영역을 포함하지 않는 것이다.
-
     traced.tracing.tracingOptions.tracingMode = TracingModeType.TRACINGMODEBLACKANDWHITE;
-
-    //traced.tracing.tracingOptions.viewRaster = ViewRasterType.TRACINGVIEWRASTERTRANSPARENTIMAGE;
-
     //별색 start
     var pmfGroup = traced.tracing.expandTracing();
 
@@ -85,7 +82,35 @@ function createOrderFile() {
       pmfGroup.pathItems[i].filled = true;
       pmfGroup.pathItems[i].fillColor = newSpotColor;
     }
-    pmfGroup.moveToBeginning(group);
+
+    var pmfColorGroup = document.groupItems.add();
+    pmfGroup.moveToBeginning(pmfColorGroup);
+
+    //invertedColor tracing
+    var invertedDesign = design.duplicate();
+    invertedDesign.name = "별색 전환";
+    invertedDesign.embed();
+
+    app.activeDocument.pathItems = invertedDesign;
+    app.executeMenuCommand("Colors6");
+
+    var target = document.pageItems.getByName("별색 전환");
+    var traced = target.trace();
+    traced.tracing.tracingOptions.threshold = 249.999;
+    traced.tracing.tracingOptions.ignoreWhite = true;
+    traced.tracing.tracingOptions.tracingMode = TracingModeType.TRACINGMODEBLACKANDWHITE;
+
+    var invertedPmfGroup = traced.tracing.expandTracing();
+
+    invertedPmfGroup.name = "별색 처리_색상변환";
+
+    for (var i = 0; i < invertedPmfGroup.pathItems.length; i++) {
+      invertedPmfGroup.pathItems[i].filled = true;
+      invertedPmfGroup.pathItems[i].fillColor = newSpotColor;
+    }
+
+    invertedPmfGroup.moveToBeginning(pmfColorGroup);
+    pmfColorGroup.moveToBeginning(group);
     //별색 end
   }
 
