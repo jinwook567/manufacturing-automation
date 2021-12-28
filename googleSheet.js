@@ -9,6 +9,7 @@ const {
   makeLocalTodayDir,
   phoneFomatter,
   getPrintAreaName,
+  getDeliveryComapnyNameByFactoryName,
 } = require("./utils");
 const { getTransaction } = require("./db");
 const _ = require("lodash");
@@ -29,9 +30,52 @@ const auth = new google.auth.GoogleAuth({
 const sheetService = google.sheets({ version: "v4", auth });
 const driveService = google.drive({ version: "v3", auth });
 
+async function getSheetIdBySpreadSheetId(spreadSheetId) {
+  const result = await sheetService.spreadsheets.get({
+    spreadsheetId: spreadSheetId,
+    includeGridData: false,
+  });
+  const data = result.data.sheets
+    ? result.data.sheets[0].properties
+      ? result.data.sheets[0].properties.sheetId
+      : undefined
+    : undefined;
+  return data;
+}
+
+async function updateProtectedCell({ spreadSheetId, sheetId, startColumnIndex, endColumnIndex }) {
+  await sheetService.spreadsheets.batchUpdate({
+    spreadsheetId: spreadSheetId,
+    requestBody: {
+      requests: [
+        {
+          addProtectedRange: {
+            protectedRange: {
+              range: {
+                sheetId: sheetId,
+                startColumnIndex: startColumnIndex,
+                endColumnIndex: endColumnIndex,
+              },
+              description: "protect",
+              warningOnly: false,
+              editors: {
+                users: [
+                  "jinwook567@we2d.com",
+                  "products@we2d.com",
+                  "googledriveserviceaccount@gooledrive-321705.iam.gserviceaccount.com",
+                ],
+              },
+            },
+          },
+        },
+      ],
+    },
+  });
+}
+
 async function getProdcutNameMakingExcel() {
   const rowsData = await sheetService.spreadsheets.values.get({
-    spreadsheetId: "12655vAKNcRwhc2lE33V2z_zuo3UdVCKwL-NbMRxoYzI",
+    spreadsheetId: "1xpNNUfUNbfYq-ASAyDuAaFcHts8PDKZ3ec3-IfzQD8I",
     //excel id, 해당 값은 고정임.
     range: "Sheet1",
   });
@@ -130,7 +174,6 @@ async function getIllustratorFileName({ transaction, excelData }) {
 async function insertSheetData(trans_ill_drive, combinedSheetId) {
   const today = getToday();
   //make insert data
-  const combined_deliveryId = uuidv4();
   for (let i in trans_ill_drive) {
     const transaction = trans_ill_drive[i];
 
@@ -190,6 +233,18 @@ async function insertSheetData(trans_ill_drive, combinedSheetId) {
       count,
     ];
 
+    const deliverySheetData = [
+      deliveryId,
+      reciever,
+      address,
+      phone,
+      deliveryMessage,
+      `${fileNames}`,
+      `${getDeliveryComapnyNameByFactoryName(transaction.illustrator.factory)}`,
+      "",
+    ];
+    //마지막 열은 운송장번호, 현재는 값이 없기 때문에 넣어주지 않음.
+
     await sheetService.spreadsheets.values.append({
       spreadsheetId: transaction.illustrator.todayFolder_OrderSheet_Id,
       // range: "Sheet1",
@@ -197,6 +252,46 @@ async function insertSheetData(trans_ill_drive, combinedSheetId) {
       valueInputOption: "RAW",
       resource: {
         values: [sheetData],
+      },
+    });
+
+    await sheetService.spreadsheets.values.append({
+      spreadsheetId: transaction.illustrator.todayFolder_DeliverySheet_Id,
+      // range: "Sheet1",
+      range: `${sheetRange}!A:H`,
+      valueInputOption: "RAW",
+      resource: {
+        values: [deliverySheetData],
+      },
+    });
+
+    //batchUpdate 운송장번호 중복제거
+    await sheetService.spreadsheets.batchUpdate({
+      spreadsheetId: transaction.illustrator.todayFolder_DeliverySheet_Id,
+      resource: {
+        requests: [
+          {
+            deleteDuplicates: {
+              range: {
+                // sheetId: sheetId,
+                startRowIndex: 1,
+                // endRowIndex: 30,
+                // row가 없으면, rows 처음부터 끝까지 전부
+                startColumnIndex: 0,
+                endColumnIndex: 7,
+              },
+              comparisonColumns: [
+                {
+                  dimension: "COLUMNS",
+                  startIndex: 0,
+                  endIndex: 1,
+                },
+                //첫 번째 열에 관련된 내용만 비교한다. (배송 id)
+                //https://developers.google.com/sheets/api/reference/rest/v4/DimensionRange
+              ],
+            },
+          },
+        ],
       },
     });
 
@@ -224,85 +319,12 @@ async function insertSheetData(trans_ill_drive, combinedSheetId) {
   console.log("엑셀 데이터 삽입 완료");
 }
 
-async function hi() {
-  const transactions = await Promise.resolve(getTransaction());
-
-  const processedTransactions = await Promise.all(
-    transactions.map(async (transaction) => {
-      const fileName = await Promise.resolve(getFileName(transaction));
-      const transactionData = transaction.toJSON();
-      return { ...transactionData, ...fileName };
-      // return fileName;
-    })
-  );
-
-  const googleSheetData = processedTransactions.map((transaction) => {
-    const reciever = transaction.recipientInfo.reciever;
-    const address =
-      transaction.recipientInfo.address + " " + transaction.recipientInfo.detailAddress;
-    const phone = phoneFomatter(transaction.recipientInfo.phone);
-    //hello
-    const deliveryMessage = transaction.recipientInfo.request || "";
-    const fileNames = transaction.aiFileAndImageName.reduce((acc, fileName, i) => {
-      if (transaction.aiFileAndImageName.length === i + 1) {
-        acc = acc + fileName.aiFileName;
-      } else {
-        acc = acc + fileName.aiFileName + "\n";
-      }
-
-      return acc;
-    }, "");
-    const count = transaction.count;
-    return {
-      id: transaction.sheetId,
-      data: [reciever, address, phone, deliveryMessage, fileNames, count],
-    };
-  });
-
-  // for (let i in googleSheetData) {
-  //   await createGoogleSheet(googleSheetData[i]);
-  // }
-  //for문으로 하지 않으면, 엑셀을 만들어놓은 데이터를 찾지못한다.
-
-  //make GoogleSheet Data
-
-  const aiFileDataIllustrator = processedTransactions.reduce((acc, data) => {
-    const result = data.aiFileAndImageName.map((fileName) => {
-      const factoryDir = makeLocalTodayDir(data.factory);
-      return {
-        ..._.pick(data, ["templateName", "factory", "saveOption"]),
-        aiFileName: fileName.aiFileName,
-        imagePath: fileName.imagePath,
-        factoryDir,
-      };
-    });
-    acc.push(...result);
-    return acc;
-  }, []);
-
-  for (let i in aiFileDataIllustrator) {
-    const data = aiFileDataIllustrator[i];
-    const templateFile = `${path.dirname(require.main.filename)}/template/${data.factory}/${
-      data.templateName
-    }.ai`;
-    const newFilePath = `${data.factoryDir}/${data.aiFileName}`;
-    const saveOption = data.saveOption;
-    const imagePath = data.imagePath;
-
-    await runApplescript(
-      `tell application "Adobe Illustrator" to do javascript "#include ${jsxPath}" with arguments {"${templateFile}", "${newFilePath}", "${imagePath}", "${saveOption}"}`
-    );
-  }
-
-  //for문 돌리기..
-}
-
-//hi();
-
 module.exports = {
   getProdcutNameMakingExcel,
   getIllustratorFileName,
   insertSheetData,
+  getSheetIdBySpreadSheetId,
+  updateProtectedCell,
 };
 
 //update Sheet

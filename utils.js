@@ -87,10 +87,29 @@ function getPrintAreaName(printArea) {
   return name;
 }
 
+function getDeliveryComapnyNameByFactoryName(factoryName) {
+  let deliveryCompany = "";
+  switch (factoryName) {
+    case "buytech":
+      deliveryCompany = "kr.cjlogistics";
+      break;
+
+    case "clothesPrinter":
+      deliveryCompany = "kr.cjlogistics";
+      break;
+
+    case "customblue":
+      deliveryCompany = "kr.epost";
+      break;
+  }
+  return deliveryCompany;
+}
+
 module.exports = {
   getToday,
   downloadImage,
   makeLocalTodayDir,
   phoneFomatter,
   getPrintAreaName,
+  getDeliveryComapnyNameByFactoryName,
 };

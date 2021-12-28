@@ -8,6 +8,7 @@ const path = require("path");
 
 const KEYFILEPATH = path.resolve("./gooledrive-321705-9b1f9f2f2dab.json");
 // const KEYFILEPATH = "/Users/jinwook/Desktop/illustrator/gooledrive-321705-9b1f9f2f2dab.json";
+const { updateProtectedCell, getSheetIdBySpreadSheetId } = require("./googleSheet");
 
 const SCOPES = ["https://www.googleapis.com/auth/drive"];
 
@@ -115,7 +116,7 @@ async function createFileAndFolder(transactions) {
   if (transactions.find((transaction) => transaction.combined)) {
     const { id } = await Promise.resolve(
       checkAndMakeGoogleFile({
-        parentFolderId: "1IP0RdBV8GDSWwY7ny92PfS8ZrItM-Nq9",
+        parentFolderId: "1of74umwOu489qtgsOSqYJiOJ07cfWn0m",
         fileName: today,
         fileType: "sheet",
       })
@@ -170,6 +171,14 @@ async function createFileAndFolder(transactions) {
           resource: {
             values: [[...sheetHead, "주문일"]],
           },
+        });
+
+        const thisMonthSheetId = await getSheetIdBySpreadSheetId(thisMonthExcelId);
+        await updateProtectedCell({
+          spreadSheetId: thisMonthExcelId,
+          sheetId: thisMonthSheetId,
+          startColumnIndex: 0,
+          endColumnIndex: 8,
         });
       }
 
@@ -233,6 +242,82 @@ async function createFileAndFolder(transactions) {
         },
       });
 
+      //protect cells order Sheet
+      const todayOrderSheet_sheetId = await getSheetIdBySpreadSheetId(todayFolder_OrderSheet_Id);
+      await updateProtectedCell({
+        spreadSheetId: todayFolder_OrderSheet_Id,
+        sheetId: todayOrderSheet_sheetId,
+        startColumnIndex: 0,
+        endColumnIndex: 8,
+      });
+
+      //일별 폴더 내 운송장 폴더 시트 생성
+      const todayDeliverySheetMetaData = {
+        name: "운송장 정보",
+        mimeType: "application/vnd.google-apps.spreadsheet",
+        parents: [`${todayFolderId}`],
+      };
+
+      const todayDeliverySheetResponse = await driveService.files.create({
+        resource: todayDeliverySheetMetaData,
+        fields: "id",
+      });
+
+      const todayFolder_DeliverySheet_Id = todayDeliverySheetResponse.data.id;
+
+      const deliverySheetHead = [
+        "배송id",
+        "이름",
+        "주소",
+        "번호",
+        "배송메시지",
+        "파일명",
+        "택배사",
+        "택배번호",
+      ];
+      await sheetService.spreadsheets.values.append({
+        spreadsheetId: todayFolder_DeliverySheet_Id,
+        // range: "Sheet1",
+        range: "Sheet1!A:H",
+        valueInputOption: "RAW",
+        resource: {
+          values: [deliverySheetHead],
+        },
+      });
+
+      //protect cells delivery Sheet
+      const todayFolder_DeliverySheet_sheetId = await getSheetIdBySpreadSheetId(
+        todayFolder_DeliverySheet_Id
+      );
+      await updateProtectedCell({
+        spreadSheetId: todayFolder_DeliverySheet_Id,
+        sheetId: todayFolder_DeliverySheet_sheetId,
+        startColumnIndex: 0,
+        endColumnIndex: 7,
+      });
+
+      // await sheetService.spreadsheets.batchUpdate({
+      //   resource: {
+      //     requests: [
+      //       {
+      //         addProtectedRange: {
+      //           protectedRange: {
+      //             range: {
+      //               sheetId: todayFolder_DeliverySheet_Id,
+      //               startColumnIndex: 0,
+      //               endColumnIndex: 6,
+      //             },
+      //             warningOnly: false,
+      //             editors: {
+      //               users: ["jinwook567@we2d.com", "products@we2d.com"],
+      //             },
+      //           },
+      //         },
+      //       },
+      //     ],
+      //   },
+      // });
+
       // 각 업체별로 합배송을 현재는 지원하지 않을 예정.
       // 합배송 프로세스가 완벽하게 짜여지고, 수량이 확보되면 그 떄 이 시스템 오픈.
 
@@ -270,6 +355,7 @@ async function createFileAndFolder(transactions) {
         thisMonthExcelId,
         todayFolder_OrderFolder_Id,
         todayFolder_OrderSheet_Id,
+        todayFolder_DeliverySheet_Id,
         localFolder_Save_Path,
       };
     })
@@ -284,6 +370,7 @@ async function createFileAndFolder(transactions) {
       "thisMonthExcelId",
       "todayFolder_OrderFolder_Id",
       "todayFolder_OrderSheet_Id",
+      "todayFolder_DeliverySheet_Id",
       "localFolder_Save_Path",
     ]);
 
