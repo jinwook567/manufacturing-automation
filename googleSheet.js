@@ -158,8 +158,8 @@ async function getIllustratorFileName({ transaction, excelData }) {
       //data[0] printArea 영문 필드명 한글로 변환
 
       const aiFileName = print
-        ? `${transaction.recipientInfo.reciever}_${fileName}${optionName}_${printAreaName}_${transaction.count}개`
-        : `${transaction.recipientInfo.reciever}_${fileName}${optionName}_${transaction.count}개`;
+        ? `${transaction.recipientInfo.reciever}_${fileName}${optionName}_${printAreaName}_${transaction.count}개_${transaction._id}`
+        : `${transaction.recipientInfo.reciever}_${fileName}${optionName}_${transaction.count}개_${transaction._id}`;
 
       return { imagePath, aiFileName };
     })
